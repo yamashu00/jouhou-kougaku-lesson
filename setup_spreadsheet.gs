@@ -272,7 +272,7 @@ function setupSheet_Step3(ss) {
     ['チュロスの材料を調達する','山田','','未着手','','','進行中','← =COUNTIF(D6:D13,"進行中")'],
     ['看板デザインを完成させる','佐藤','','完了','','','未着手','← =COUNTIF(D6:D13,"未着手")'],
     ['値段設定と原価計算をする','伊藤','','未着手','','','完了率','← 完了数÷総タスク数'],
-    ['当日のシフト表を作る','田中','','未着手','','','進捗バー','← =SPARKLINE(H10,{"charttype","bar","max",1})（発展）'],
+    ['当日のシフト表を作る','田中','','未着手','','','進捗バー','← =SPARKLINE(H10,{"charttype","bar";"max",1})（発展）'],
     ['試食会の日程調整をする','鈴木','','進行中','','','',''],
     ['会計報告書のフォーマットを作る','伊藤','','完了','','','',''],
     ['','','','','','','',''],
@@ -484,7 +484,7 @@ function setupSheet_Step5(ss) {
     ['=COUNTIF(E13:E33,"進行中")'],
     ['=COUNTIF(E13:E33,"未着手")'],
     ['=IFERROR(H7/H6,0)'],
-    ['=SPARKLINE(H10,{"charttype","bar","max",1})'],
+    ['=SPARKLINE(H10,{"charttype","bar";"max",1})'],
   ]);
   sh.getRange(10,8).setNumberFormat('0%');
 
@@ -558,7 +558,7 @@ function setupSheet_Step6(ss) {
   sh.getRange(4,1,1,4).setValues([['📊 発展関数一覧','','','']]);
   sh.getRange(5,1,1,4).setValues([['#','機能','数式例','できること']]);
   sh.getRange(6,1,6,4).setValues([
-    [1,'SPARKLINE','=SPARKLINE(C2/B2,{"charttype","bar","max",1})','セル内に棒グラフを表示。完了率の可視化に最適'],
+    [1,'SPARKLINE','=SPARKLINE(C2/B2,{"charttype","bar";"max",1})','セル内に棒グラフを表示。完了率の可視化に最適'],
     [2,'FILTER','=FILTER(A2:E20,E2:E20<>"完了")','条件を満たす行を自動抽出。未完了タスク一覧に便利'],
     [3,'QUERY','=QUERY(A:E,"SELECT * WHERE E=\'未着手\' ORDER BY D")','SQL風でデータ絞り込み・並び替え'],
     [4,'IMPORTRANGE','=IMPORTRANGE("スプシURL","シート名!A:E")','別ファイルのデータをリアルタイム取得'],
@@ -573,11 +573,11 @@ function setupSheet_Step6(ss) {
     ['田中',5,3],['鈴木',4,4],['山田',6,2],['佐藤',3,3],['伊藤',4,1],
   ]);
   sh.getRange(15,4,5,1).setFormulas([
-    ['=SPARKLINE(C15/B15,{"charttype","bar","max",1,"color1","#16a34a"})'],
-    ['=SPARKLINE(C16/B16,{"charttype","bar","max",1,"color1","#2196f3"})'],
-    ['=SPARKLINE(C17/B17,{"charttype","bar","max",1,"color1","#ff9800"})'],
-    ['=SPARKLINE(C18/B18,{"charttype","bar","max",1,"color1","#16a34a"})'],
-    ['=SPARKLINE(C19/B19,{"charttype","bar","max",1,"color1","#ff9800"})'],
+    ['=SPARKLINE(C15/B15,{"charttype","bar";"max",1;"color1","#16a34a"})'],
+    ['=SPARKLINE(C16/B16,{"charttype","bar";"max",1;"color1","#2196f3"})'],
+    ['=SPARKLINE(C17/B17,{"charttype","bar";"max",1;"color1","#ff9800"})'],
+    ['=SPARKLINE(C18/B18,{"charttype","bar";"max",1;"color1","#16a34a"})'],
+    ['=SPARKLINE(C19/B19,{"charttype","bar";"max",1;"color1","#ff9800"})'],
   ]);
 
   // GASセクション

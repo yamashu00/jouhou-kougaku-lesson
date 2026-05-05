@@ -499,7 +499,7 @@ function Step3() {
       </div>
 
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm">
-        <strong>💡 SPARKLINE（発展）:</strong>  <code className="bg-gray-200 px-1 rounded">=SPARKLINE(COUNTIF(D:D,"完了")/COUNTA(A2:A100),{"{"}"charttype","bar","max",1{"}"} )</code> でセル内に進捗バーを作れる！
+        <strong>💡 SPARKLINE（発展）:</strong>  <code className="bg-gray-200 px-1 rounded">=SPARKLINE(COUNTIF(D:D,"完了")/COUNTA(A2:A100),{"{"}"charttype","bar";"max",1{"}"} )</code> でセル内に進捗バーを作れる！
       </div>
     </div>
   );
@@ -1105,7 +1105,7 @@ function Step6() {
   const formulaCards = [
     { emoji:'📊', title:'SPARKLINE でセル内グラフ',
       desc:'担当者別の完了率を棒グラフでセル内に表示。charttype を line や pie に変えるとグラフ種類が変わる。',
-      formula:'=SPARKLINE(D2/C2,{"charttype","bar","max",1,"color1","#16a34a"})' },
+      formula:'=SPARKLINE(D2/C2,{"charttype","bar";"max",1;"color1","#16a34a"})' },
     { emoji:'🔍', title:'FILTER で未完了タスクを抽出',
       desc:'別シートや別の範囲に、未完了のタスクだけを自動でリストアップする。データが更新されると自動反映。',
       formula:'=FILTER(A2:E20,E2:E20<>"完了")' },
@@ -1152,7 +1152,7 @@ function Step6() {
           <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
             <div className="bg-black text-white px-5 py-3 flex justify-between items-center flex-wrap gap-2">
               <span className="font-black">SPARKLINE — セル内グラフのデモ</span>
-              <Formula>{'=SPARKLINE(完了数/タスク数,{"charttype","bar","max",1})'}</Formula>
+              <Formula>{'=SPARKLINE(完了数/タスク数,{"charttype","bar";"max",1})'}</Formula>
             </div>
             <table className="w-full text-sm border-collapse">
               <thead>
