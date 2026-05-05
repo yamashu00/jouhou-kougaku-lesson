@@ -142,7 +142,7 @@ function Intro({onStart}) {
           スプレッドシートで<br/>「自動で動く」シートを作ろう
         </h2>
         <p className="text-gray-500 text-sm max-w-xl">
-          文化祭の準備をテーマに、関数・プルダウン・条件付き書式を学ぶ。
+          まるごと祭の準備をテーマに、関数・プルダウン・条件付き書式を学ぶ。
           最終的には<strong className="text-black">期限が近づいたら自動で色が変わる</strong>タスク管理シートが完成する。
         </p>
       </div>
@@ -793,7 +793,7 @@ function Step5() {
           <Tag color="green">課題</Tag>
         </div>
         <Checklist items={[
-          '自分たちの文化祭チームのタスクを入力する（最低5件）',
+          '自分たちのまるごと祭チームのタスクを入力する（最低5件）',
           '各タスクに担当者・期限・ステータスを設定する',
           'COUNTIF で完了件数、未着手件数を集計する',
           '条件付き書式で期限切れ・まもなく・完了を色分けする',
@@ -853,7 +853,7 @@ const GAS_EXAMPLES = [
   if (alerts) {
     GmailApp.sendEmail(
       Session.getActiveUser().getEmail(),
-      '【文化祭】期限が近いタスクがあります',
+      '【まるごと祭】期限が近いタスクがあります',
       '以下のタスクを確認してください:\\n\\n' + alerts
     );
     Logger.log('メール送信完了');
@@ -994,7 +994,7 @@ const GAS_EXAMPLES = [
 
   GmailApp.sendEmail(
     Session.getActiveUser().getEmail(),
-    '【週次】文化祭タスク進捗レポート',
+    '【週次】まるごと祭タスク進捗レポート',
     body
   );
 }`,
@@ -1058,7 +1058,7 @@ function checkAndNotify() {
 
   const html = \`<!DOCTYPE html>
 <html><body>
-<h1>文化祭タスク一覧</h1>
+<h1>まるごと祭タスク一覧</h1>
 <table border="1">
   <tr><th>タスク</th><th>担当</th><th>ステータス</th></tr>
   \${rows}
@@ -1114,7 +1114,7 @@ function Step6() {
       formula:'=IMPORTRANGE("スプレッドシートURL","シート名!A:E")' },
     { emoji:'🤖', title:'AI関数でタスクを自動生成',
       desc:'Gemini連携の=AI()関数でタスクリストを自動生成。セルにイベント名を入力するだけで提案が出る。',
-      formula:'=AI("文化祭の模擬店「チュロス屋」の準備タスクを5件、箇条書きで")' },
+      formula:'=AI("まるごと祭の模擬店「チュロス屋」の準備タスクを5件、箇条書きで")' },
     { emoji:'📅', title:'QUERY で条件検索・ソート',
       desc:'SQL風の記法でデータを絞り込み・並び替え。担当者でフィルタリングしたり期限順に並べたりできる。',
       formula:'=QUERY(A:E,"SELECT * WHERE E=\'未着手\' ORDER BY D ASC")' },
