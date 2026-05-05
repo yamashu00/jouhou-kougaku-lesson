@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>情報工学基礎 — スプレッドシート実習</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['"Noto Sans JP"', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Noto Sans JP', sans-serif; }
+    body { background: #fff; color: #0a0a0a; }
+    .formula-box {
+      background: #0a0a0a; color: #4ade80;
+      font-family: 'Courier New', monospace; font-size: 13px;
+      padding: 8px 14px; border-radius: 6px; display: inline-block;
+    }
+    .cell { border: 1px solid #d4d4d4; padding: 8px 12px; }
+    .cell-head { background: #f4f4f4; font-weight: 700; font-size: 11px; color: #666; text-transform: uppercase; letter-spacing:.05em; }
+    .cell-sum  { background: #f0fdf4; color: #16a34a; font-weight: 700; }
+    .cell-num  { border: none; background: transparent; width: 100%; text-align: right; outline: none; }
+    .cell-num:focus { background: #fffbeb; }
+    select.ss { border: none; background: transparent; width: 100%; cursor: pointer; outline: none; font-size: 13px; font-weight: 600; }
+    @keyframes fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .fadein { animation: fadein .25s ease-out; }
+    @keyframes aipulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+    .ai-pulse { animation: aipulse 1.2s ease-in-out infinite; }
+    .tag { font-size: 11px; font-weight: 700; letter-spacing:.08em; text-transform: uppercase; }
+    .step-nav-btn { transition: all .15s; }
+    .timeline-dot-active { background: #0a0a0a; }
+    .timeline-dot-done   { background: #16a34a; }
+    .timeline-dot-inactive { background: #e5e5e5; }
+
+    /* チャレンジカード */
+    .challenge-card { border-left: 4px solid #0a0a0a; background: #f9f9f9; padding: 14px 16px; border-radius: 0 8px 8px 0; }
+    .advance-card   { border-left: 4px solid #7c3aed; background: #faf5ff; padding: 14px 16px; border-radius: 0 8px 8px 0; }
+    /* チェックボックス風 */
+    .check-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; cursor: pointer; }
+    .check-box  { width: 18px; height: 18px; border: 2px solid #d4d4d4; border-radius: 3px; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; }
+    .check-box.done { border-color: #16a34a; background: #16a34a; }
+
+    /* ステータス配色 */
+    .s-todo  { background: #f3f4f6; color: #4b5563; border-color: #d1d5db; }
+    .s-doing { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
+    .s-done  { background: #f0fdf4; color: #16a34a; border-color: #86efac; }
+  </style>
+</head>
+<body class="bg-white min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useCallback } = React;
+
+/* ── utils ── */
+const today = new Date(); today.setHours(0,0,0,0);
+const offset = d => { const x=new Date(today); x.setDate(x.getDate()+d); return x.toISOString().split('T')[0]; };
+const diff   = s => { if(!s) return null; const t=new Date(s); t.setHours(0,0,0,0); return Math.ceil((t-today)/86400000); };
+const fmtDate = s => { if(!s) return ''; const d=new Date(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+const comma = n => Number(n).toLocaleString();
+
+/* ── 共通UI ── */
+const Formula = ({children}) => <span className="formula-box">{children}</span>;
+const Tag = ({children,color='black'}) => (
+  <span className={`tag text-xs px-2 py-0.5 rounded-full border-2 ${
+    color==='green'  ? 'border-green-600 text-green-700' :
+    color==='purple' ? 'border-purple-600 text-purple-700' :
+    color==='red'    ? 'border-red-600 text-red-700' :
+    'border-black text-black'
+  }`}>{children}</span>
+);
+
+/* チェックリスト（実習手順） */
+function Checklist({items}) {
+  const [done, setDone] = useState(items.map(()=>false));
+  return (
+    <div>
+      {items.map((item,i)=>(
+        <div key={i} className="check-item" onClick={()=>setDone(d=>{const x=[...d];x[i]=!x[i];return x;})}>
+          <div className={`check-box ${done[i]?'done':''}`}>{done[i]&&<span className="text-white text-xs font-black">✓</span>}</div>
+          <span className={`text-sm leading-snug ${done[i]?'line-through text-gray-400':''}`}>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* 発展課題カード */
+function AdvCard({emoji,title,desc,formula}) {
+  return (
+    <div className="advance-card mb-3">
+      <div className="flex items-center gap-2 mb-1">
+        <span>{emoji}</span>
+        <span className="font-bold text-sm text-purple-800">{title}</span>
+      </div>
+      <p className="text-xs text-gray-600 mb-2">{desc}</p>
+      {formula && <Formula>{formula}</Formula>}
+    </div>
+  );
+}
+
+/* ステータス select */
+function StatusSelect({value, onChange}) {
+  const cls = value==='完了' ? 's-done' : value==='進行中' ? 's-doing' : 's-todo';
+  return (
+    <select value={value} onChange={e=>onChange(e.target.value)}
+      className={`ss rounded-lg px-2 py-1 border ${cls}`}>
+      <option>未着手</option><option>進行中</option><option>完了</option>
+    </select>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   導入パネル（全体概要）
+══════════════════════════════════════════════ */
+function Intro({onStart}) {
+  const timeline = [
+    { time:'0–5分',   label:'導入', desc:'完成形を見て、今日のゴールを確認', step:'このサイト' },
+    { time:'5–20分',  label:'STEP 1', desc:'SUM/AVERAGE：予算表を作る', step:'基本' },
+    { time:'20–35分', label:'STEP 2', desc:'IF/IFS：条件で自動判定', step:'基本' },
+    { time:'35–50分', label:'STEP 3', desc:'COUNTIF：集計して可視化', step:'基本' },
+    { time:'50–70分', label:'STEP 4', desc:'プルダウン＋条件付き書式', step:'実践' },
+    { time:'70–85分', label:'STEP 5', desc:'完成形：タスク管理シートを仕上げる', step:'実践' },
+    { time:'85–90分', label:'STEP 6', desc:'発展：グラフ・SPARKLINE・AI関数', step:'発展' },
+  ];
+  return (
+    <div className="fadein">
+      <div className="mb-8">
+        <Tag>今日のゴール</Tag>
+        <h2 className="text-3xl font-black mt-3 mb-2 leading-tight">
+          スプレッドシートで<br/>「自動で動く」シートを作ろう
+        </h2>
+        <p className="text-gray-500 text-sm max-w-xl">
+          文化祭の準備をテーマに、関数・プルダウン・条件付き書式を学ぶ。
+          最終的には<strong className="text-black">期限が近づいたら自動で色が変わる</strong>タスク管理シートが完成する。
+        </p>
+      </div>
+
+      {/* 到達目標 */}
+      <div className="grid grid-cols-3 gap-3 mb-8">
+        {[
+          { level:'合格', color:'bg-gray-100 border-gray-300', icon:'📋', desc:'プルダウン設定＋ステータスで色変え', sub:'全員ここまで' },
+          { level:'良',   color:'bg-blue-50 border-blue-200',  icon:'📊', desc:'COUNTIF/IFで自動集計・自動判定', sub:'目標ライン' },
+          { level:'優',   color:'bg-green-50 border-green-200',icon:'✨', desc:'グラフ/SPARKLINE/AI関数に挑戦', sub:'できたら発展へ' },
+        ].map(r=>(
+          <div key={r.level} className={`border-2 rounded-xl p-4 ${r.color}`}>
+            <div className="text-2xl mb-2">{r.icon}</div>
+            <div className="font-black text-lg mb-1">{r.level}</div>
+            <div className="text-xs text-gray-600 mb-2">{r.desc}</div>
+            <div className="tag text-gray-400">{r.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* タイムライン */}
+      <div className="border-2 border-black rounded-xl overflow-hidden mb-8">
+        <div className="bg-black text-white px-5 py-3">
+          <span className="font-black">90分タイムライン</span>
+        </div>
+        <div>
+          {timeline.map((t,i)=>(
+            <div key={i} className={`flex items-center gap-4 px-5 py-3 border-b border-gray-100 last:border-0 ${i===0?'bg-green-50':''}`}>
+              <div className="w-20 flex-shrink-0 font-mono text-xs text-gray-400">{t.time}</div>
+              <div className="w-20 flex-shrink-0">
+                <span className={`tag text-xs px-2 py-0.5 rounded-full ${
+                  t.step==='基本' ? 'bg-black text-white' :
+                  t.step==='実践' ? 'bg-gray-700 text-white' :
+                  t.step==='発展' ? 'bg-purple-700 text-white' :
+                  'bg-green-100 text-green-700'
+                }`}>{t.step}</span>
+              </div>
+              <div className="flex-1">
+                <span className="font-bold text-sm">{t.label}</span>
+                <span className="text-gray-500 text-xs ml-2">{t.desc}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={onStart}
+        className="w-full py-4 bg-black text-white rounded-xl font-black text-lg hover:bg-gray-800 transition-colors"
+      >
+        STEP 1 からはじめる →
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   STEP 1 — SUM / AVERAGE
+══════════════════════════════════════════════ */
+const BUDGET = [
+  { name:'材料費（チュロス）', budget:15000 },
+  { name:'備品費（容器・袋）', budget:5000 },
+  { name:'看板・ポスター印刷', budget:3000 },
+  { name:'ユニフォーム',       budget:8000 },
+  { name:'その他雑費',         budget:2000 },
+];
+
+function Step1() {
+  const [spent, setSpent] = useState([12000,4800,2500,0,800]);
+  const totalB = BUDGET.reduce((a,b)=>a+b.budget,0);
+  const totalS = spent.reduce((a,b)=>a+b,0);
+  const totalL = totalB - totalS;
+  const avg    = Math.round(totalS / spent.filter(v=>v>0).length || 0);
+
+  return (
+    <div className="fadein">
+      <div className="mb-5">
+        <Tag>STEP 1</Tag>
+        <h2 className="text-2xl font-black mt-2 mb-1">SUM・AVERAGE — 合計と平均</h2>
+        <p className="text-gray-500 text-sm">
+          数字を手で足し算するのは非効率。<strong className="text-black">関数を使えば何百行でも一瞬で計算</strong>でき、数字を変えると自動で再計算される。
+        </p>
+      </div>
+
+      <div className="flex gap-3 flex-wrap mb-5">
+        <div><Formula>=SUM(C2:C6)</Formula><span className="text-xs text-gray-400 ml-2">← 支出の合計</span></div>
+        <div><Formula>=AVERAGE(C2:C6)</Formula><span className="text-xs text-gray-400 ml-2">← 支出の平均</span></div>
+      </div>
+
+      <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr>
+              <th className="cell cell-head text-left">品目</th>
+              <th className="cell cell-head text-right">予算</th>
+              <th className="cell cell-head text-right">支出（編集可）</th>
+              <th className="cell cell-head text-right">残額</th>
+            </tr>
+          </thead>
+          <tbody>
+            {BUDGET.map((item,i)=>{
+              const left = item.budget - spent[i];
+              return (
+                <tr key={i}>
+                  <td className="cell">{item.name}</td>
+                  <td className="cell text-right text-gray-400">{comma(item.budget)}</td>
+                  <td className="cell text-right">
+                    <input type="number" className="cell-num" value={spent[i]} min={0}
+                      onChange={e=>{const v=[...spent];v[i]=Number(e.target.value)||0;setSpent(v);}} />
+                  </td>
+                  <td className={`cell text-right font-bold ${left<0?'text-red-600 bg-red-50':'text-gray-700'}`}>{comma(left)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-black">
+              <td className="cell cell-head font-black">合計 / 平均</td>
+              <td className="cell cell-sum text-right">{comma(totalB)}</td>
+              <td className="cell text-right bg-yellow-50 font-bold">
+                <div>{comma(totalS)}</div>
+                <div className="text-xs text-gray-400">平均: {comma(avg)}</div>
+              </td>
+              <td className={`cell text-right font-black text-base ${totalL<0?'bg-red-50 text-red-600':'cell-sum'}`}>{comma(totalL)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* 実習ガイド */}
+      <div className="challenge-card mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-black text-sm">📋 Googleスプレッドシートでやってみよう</span>
+          <Tag>実習</Tag>
+        </div>
+        <Checklist items={[
+          'A1〜D1に「品目」「予算」「支出」「残額」と入力する',
+          'A2〜A6に品目名を入力する（何でもOK）',
+          'B2〜B6に予算の金額を入力する',
+          'C2〜C6に支出の金額を入力する',
+          'B7に =SUM(B2:B6) と入力して合計を出す',
+          'D2に =B2-C2 と入力して残額を計算し、D6までコピーする',
+          '【発展】C7に =AVERAGE(C2:C6) で平均支出を出す',
+        ]} />
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm">
+        <strong>💡 ポイント:</strong> 支出の数字を変えると合計・残額が即座に更新されます。残額がマイナスになると自動で赤くなるのは、次のステップで学ぶ「<strong>条件付き書式</strong>」です。
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   STEP 2 — IF / IFS
+══════════════════════════════════════════════ */
+const SCORE_DATA = [
+  { name:'田中', task:'申請書の提出',     deadline: offset(-1), done: false },
+  { name:'鈴木', task:'試作品の試食',     deadline: offset(2),  done: false },
+  { name:'山田', task:'材料の調達',       deadline: offset(6),  done: false },
+  { name:'佐藤', task:'看板デザイン完成', deadline: offset(8),  done: true  },
+  { name:'伊藤', task:'原価計算',         deadline: offset(12), done: false },
+];
+
+function Step2() {
+  const [rows, setRows] = useState(SCORE_DATA.map(r=>({...r})));
+
+  function judge(r) {
+    if(r.done) return { text:'✅ 完了',     cls:'text-green-600 font-bold' };
+    const d = diff(r.deadline);
+    if(d < 0)  return { text:'🚨 期限切れ', cls:'text-red-600 font-bold' };
+    if(d <= 3) return { text:'⚠️ まもなく', cls:'text-amber-600 font-bold' };
+    return       { text:'🟢 余裕あり',      cls:'text-gray-500' };
+  }
+
+  return (
+    <div className="fadein">
+      <div className="mb-5">
+        <Tag>STEP 2</Tag>
+        <h2 className="text-2xl font-black mt-2 mb-1">IF / IFS — 条件で結果を切り替え</h2>
+        <p className="text-gray-500 text-sm">
+          「もし〇〇なら△△、そうでなければ××」という<strong className="text-black">条件分岐</strong>を関数で書く。プログラミングの if 文と同じ考え方。
+        </p>
+      </div>
+
+      <div className="space-y-3 mb-5">
+        <div>
+          <Formula>=IF(D2="完了","✅ 完了", IF(E2&lt;TODAY(),"🚨 期限切れ","🟢 余裕あり"))</Formula>
+          <p className="text-xs text-gray-400 mt-1 ml-1">IFを入れ子にして複数条件を判定</p>
+        </div>
+        <div>
+          <Formula>=IFS(D2="完了","✅ 完了", E2&lt;TODAY(),"🚨 期限切れ", TRUE,"🟢 余裕あり")</Formula>
+          <p className="text-xs text-gray-400 mt-1 ml-1">IFS関数を使うとすっきり書ける（発展）</p>
+        </div>
+      </div>
+
+      <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr>
+              <th className="cell cell-head text-left">担当</th>
+              <th className="cell cell-head text-left">タスク</th>
+              <th className="cell cell-head text-center">期限</th>
+              <th className="cell cell-head text-center">完了？</th>
+              <th className="cell cell-head text-center bg-black text-white">IF の結果</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r,i)=>{
+              const j = judge(r);
+              const d = diff(r.deadline);
+              return (
+                <tr key={i} className={r.done?'opacity-50':''}>
+                  <td className="cell font-medium">{r.name}</td>
+                  <td className={`cell ${r.done?'line-through text-gray-400':''}`}>{r.task}</td>
+                  <td className={`cell text-center text-sm ${!r.done&&d<0?'text-red-600 font-bold':!r.done&&d<=3?'text-amber-600 font-bold':'text-gray-500'}`}>
+                    {fmtDate(r.deadline)}
+                  </td>
+                  <td className="cell text-center">
+                    <input type="checkbox" checked={r.done} className="w-4 h-4 cursor-pointer"
+                      onChange={()=>{const rs=[...rows];rs[i]={...rs[i],done:!rs[i].done};setRows(rs);}} />
+                  </td>
+                  <td className={`cell text-center bg-gray-50 ${j.cls}`}>{j.text}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="challenge-card mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-black text-sm">📋 やってみよう</span>
+          <Tag>実習</Tag>
+        </div>
+        <Checklist items={[
+          'A列に名前、B列にタスク名、C列に期限（例: 5/10）を入力する',
+          'D列に「完了」か「未完了」を手動で入力する',
+          'E2に =IF(D2="完了","✅ 完了","❌ 未完了") と入力する',
+          'E2をE6までコピーして、D列を変えると自動で変わるか確認する',
+          '【発展】TODAY()と比較して期限切れかどうかも判定に追加する',
+          '【発展】IFS関数でリファクタリングしてみる',
+        ]} />
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm">
+        <strong>💡 ポイント:</strong> チェックボックスを切り替えると右列の判定が即座に変わります。期限の日付と <strong>TODAY()</strong> を比較して「期限切れ」を自動判定するのがポイント。
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   STEP 3 — COUNTIF / COUNTA
+══════════════════════════════════════════════ */
+function Step3() {
+  const [statuses, setStatuses] = useState(['未着手','進行中','未着手','完了','未着手','進行中','完了','未着手']);
+  const tasks = [
+    '保健所申請書の提出','試作品の試食','材料の調達',
+    '看板デザイン','値段設定','シフト表作成','当日マニュアル','会計報告書',
+  ];
+  const persons = ['田中','鈴木','山田','佐藤','伊藤','田中','鈴木','山田'];
+
+  const cnt = (s) => statuses.filter(x=>x===s).length;
+  const total = statuses.length;
+  const pct = Math.round(cnt('完了')/total*100);
+
+  return (
+    <div className="fadein">
+      <div className="mb-5">
+        <Tag>STEP 3</Tag>
+        <h2 className="text-2xl font-black mt-2 mb-1">COUNTIF / COUNTA — 集計</h2>
+        <p className="text-gray-500 text-sm">
+          「完了は何件？」「未着手は何件？」を手で数えるのは非効率。<strong className="text-black">COUNTIF で条件に合うセルを自動集計</strong>できる。進捗バーもこれで作れる。
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
+        <div><Formula>=COUNTIF(D:D,"完了")</Formula><p className="text-xs text-gray-400 mt-1">D列の「完了」の数を数える</p></div>
+        <div><Formula>=COUNTA(A2:A100)</Formula><p className="text-xs text-gray-400 mt-1">タスクの総数を数える</p></div>
+        <div><Formula>=COUNTIF(D:D,"完了")/COUNTA(A2:A100)</Formula><p className="text-xs text-gray-400 mt-1">完了率（%）を計算する</p></div>
+        <div><Formula>=COUNTIFS(C:C,"田中",D:D,"完了")</Formula><p className="text-xs text-gray-400 mt-1">田中さんの完了数（複数条件）</p></div>
+      </div>
+
+      {/* リアルタイム集計ボード */}
+      <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
+        <div className="bg-black text-white px-5 py-3 flex justify-between items-center">
+          <span className="font-black">リアルタイム集計</span>
+          <span className="text-xs text-gray-400">ステータスを変えると自動で更新</span>
+        </div>
+        <div className="grid grid-cols-4 divide-x divide-gray-100 border-b-2 border-black">
+          {[
+            { label:'総タスク数',  val:total,        sub:'=COUNTA(A2:A9)',           bg:'bg-white' },
+            { label:'未着手',      val:cnt('未着手'), sub:'=COUNTIF(D:D,"未着手")',  bg:'bg-gray-50' },
+            { label:'進行中',      val:cnt('進行中'), sub:'=COUNTIF(D:D,"進行中")',  bg:'bg-blue-50' },
+            { label:'完了',        val:cnt('完了'),   sub:'=COUNTIF(D:D,"完了")',    bg:'bg-green-50' },
+          ].map(c=>(
+            <div key={c.label} className={`${c.bg} px-4 py-4 text-center`}>
+              <div className="text-2xl font-black">{c.val}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{c.label}</div>
+              <div className="font-mono text-xs text-gray-300 mt-1 hidden sm:block">{c.sub}</div>
+            </div>
+          ))}
+        </div>
+        {/* 進捗バー */}
+        <div className="px-5 py-4">
+          <div className="flex justify-between text-xs text-gray-500 mb-2">
+            <span>完了率</span>
+            <span className="font-black text-black">{pct}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-3">
+            <div className="h-3 rounded-full transition-all duration-400"
+              style={{width:`${pct}%`, background: pct===100?'#16a34a':'#0a0a0a'}} />
+          </div>
+        </div>
+        {/* テーブル */}
+        <div className="border-t border-gray-100">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                <th className="cell cell-head text-left">タスク名</th>
+                <th className="cell cell-head text-left w-20">担当</th>
+                <th className="cell cell-head text-center w-28">ステータス ▼</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((t,i)=>(
+                <tr key={i} className={statuses[i]==='完了'?'opacity-50':''}>
+                  <td className={`cell ${statuses[i]==='完了'?'line-through text-gray-400':''}`}>{t}</td>
+                  <td className="cell text-gray-500 text-xs">{persons[i]}</td>
+                  <td className="cell text-center">
+                    <StatusSelect value={statuses[i]} onChange={v=>{const s=[...statuses];s[i]=v;setStatuses(s);}} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="challenge-card mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-black text-sm">📋 やってみよう</span>
+          <Tag>実習</Tag>
+        </div>
+        <Checklist items={[
+          'STEP 1・2で作ったシートのD列にステータスを入力する（未着手/進行中/完了）',
+          '空きセルに =COUNTIF(D:D,"完了") と入力して完了数を出す',
+          '=COUNTA(A2:A100) で総タスク数を出す',
+          '完了率（%）を計算する式を書く（完了数÷総数）',
+          '【発展】COUNTIFS で「自分が担当 かつ 完了」を集計する',
+          '【発展】SPARKLINE関数で進捗バーをセル内に作る',
+        ]} />
+      </div>
+
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm">
+        <strong>💡 SPARKLINE（発展）:</strong>  <code className="bg-gray-200 px-1 rounded">=SPARKLINE(COUNTIF(D:D,"完了")/COUNTA(A2:A100),{"{"}"charttype","bar","max",1{"}"} )</code> でセル内に進捗バーを作れる！
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   STEP 4 — プルダウン＋条件付き書式
+══════════════════════════════════════════════ */
+const STEP4_TASKS = [
+  { id:1, name:'保健所に申請書を提出する', person:'田中', deadline:offset(-1), status:'未着手' },
+  { id:2, name:'試作品を先生に試食してもらう', person:'鈴木', deadline:offset(2), status:'進行中' },
+  { id:3, name:'チュロスの材料を調達する', person:'山田', deadline:offset(5), status:'未着手' },
+  { id:4, name:'看板デザインを完成させる', person:'佐藤', deadline:offset(7), status:'完了' },
+  { id:5, name:'値段設定と原価計算をする', person:'伊藤', deadline:offset(10), status:'未着手' },
+];
+
+function rowBg(t) {
+  if(t.status==='完了') return 'bg-green-50 opacity-60';
+  const d = diff(t.deadline);
+  if(d<0) return 'bg-red-50';
+  if(d<=3) return 'bg-amber-50';
+  return '';
+}
+function dlStyle(t) {
+  if(t.status==='完了') return 'text-gray-400';
+  const d=diff(t.deadline);
+  if(d<0) return 'text-red-600 font-bold';
+  if(d<=3) return 'text-amber-600 font-bold';
+  return 'text-gray-500';
+}
+
+function Step4() {
+  const [tasks, setTasks] = useState(STEP4_TASKS.map(t=>({...t})));
+
+  return (
+    <div className="fadein">
+      <div className="mb-5">
+        <Tag>STEP 4</Tag>
+        <h2 className="text-2xl font-black mt-2 mb-1">プルダウン ＋ 条件付き書式</h2>
+        <p className="text-gray-500 text-sm">
+          <strong className="text-black">「データの入力規則」</strong>でプルダウンを作り、<strong className="text-black">「条件付き書式」</strong>でセルの色を自動変更。関数を書かなくてもクリック操作だけで設定できるが、裏では数式が動いている。
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
+        <div className="border border-gray-100 rounded-xl p-3">
+          <div className="tag text-gray-400 mb-2">条件①（完了行）</div>
+          <Formula>=$D2="完了"</Formula>
+          <p className="text-xs text-gray-400 mt-2">→ 行全体を緑グレーに</p>
+        </div>
+        <div className="border border-gray-100 rounded-xl p-3">
+          <div className="tag text-gray-400 mb-2">条件②（期限切れ）</div>
+          <Formula>=AND($D2&lt;&gt;"完了",$C2&lt;TODAY())</Formula>
+          <p className="text-xs text-gray-400 mt-2">→ 期限列を赤背景に</p>
+        </div>
+        <div className="border border-gray-100 rounded-xl p-3">
+          <div className="tag text-gray-400 mb-2">条件③（3日以内）</div>
+          <Formula>=AND($D2&lt;&gt;"完了",$C2-TODAY()&lt;=3)</Formula>
+          <p className="text-xs text-gray-400 mt-2">→ 黄色で警告</p>
+        </div>
+        <div className="border border-gray-100 rounded-xl p-3">
+          <div className="tag text-gray-400 mb-2">プルダウン設定</div>
+          <div className="text-xs text-gray-600">データ → データの入力規則<br/>→ リスト「未着手,進行中,完了」</div>
+        </div>
+      </div>
+
+      <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-black text-white">
+              <th className="cell border-gray-700 text-left">タスク名</th>
+              <th className="cell border-gray-700 text-left w-20">担当</th>
+              <th className="cell border-gray-700 text-center w-24">期限</th>
+              <th className="cell border-gray-700 text-center w-32">ステータス ▼</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((t,i)=>(
+              <tr key={t.id} className={`transition-all duration-200 border-b border-gray-100 ${rowBg(t)}`}>
+                <td className={`cell font-medium ${t.status==='完了'?'line-through text-gray-400':''}`}>{t.name}</td>
+                <td className={`cell text-sm ${t.status==='完了'?'text-gray-400':'text-gray-600'}`}>{t.person}</td>
+                <td className={`cell text-center text-sm ${dlStyle(t)}`}>
+                  {fmtDate(t.deadline)}
+                  {t.status!=='完了' && diff(t.deadline)<0 && <div className="text-xs">期限切れ</div>}
+                  {t.status!=='完了' && diff(t.deadline)>=0 && diff(t.deadline)<=3 && <div className="text-xs">あと{diff(t.deadline)}日</div>}
+                </td>
+                <td className="cell text-center">
+                  <StatusSelect value={t.status} onChange={v=>{const ts=[...tasks];ts[i]={...ts[i],status:v};setTasks(ts);}} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="challenge-card mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-black text-sm">📋 やってみよう</span>
+          <Tag>実習</Tag>
+        </div>
+        <Checklist items={[
+          'D列のセルを選択し、データ → データの入力規則 → リスト を開く',
+          '「未着手,進行中,完了」と入力してOK → プルダウンができたか確認',
+          '行全体を選択し、書式 → 条件付き書式 を開く',
+          '「カスタム数式」に =$D2="完了" と入力し、色を緑/グレーに設定',
+          '別の条件を追加：=$C2<TODAY() で赤に設定する',
+          '【発展】AND関数を使って「未完了 かつ 期限切れ」の条件を書く',
+        ]} />
+      </div>
+
+      <div className="flex gap-2 text-xs text-gray-500 flex-wrap">
+        {[['bg-green-50 border-green-200','完了（緑）'],['bg-red-50 border-red-200','期限切れ（赤）'],['bg-amber-50 border-amber-200','3日以内（黄）']].map(([cls,label])=>(
+          <div key={label} className={`flex items-center gap-1.5 border rounded-full px-3 py-1 ${cls}`}>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   STEP 5 — 完成形タスク管理シート
+══════════════════════════════════════════════ */
+const AI_TASKS = [
+  { name:'保健所への模擬店申請書を提出', person:'班長', deadline:offset(14) },
+  { name:'試作品（チュロス）を作り先生に試食', person:'製造チーム', deadline:offset(21) },
+  { name:'材料を業者に発注する', person:'会計', deadline:offset(18) },
+  { name:'看板・メニューボードをデザイン', person:'デザイン担当', deadline:offset(25) },
+  { name:'原価計算と販売価格を決定', person:'会計', deadline:offset(10) },
+];
+const INIT5 = [
+  { id:1, name:'保健所に申請書を提出する', person:'田中', deadline:offset(-1), status:'未着手' },
+  { id:2, name:'試作品を先生に試食してもらう', person:'鈴木', deadline:offset(2), status:'進行中' },
+  { id:3, name:'チュロスの材料を調達する', person:'山田', deadline:offset(5), status:'未着手' },
+  { id:4, name:'看板デザインを完成させる', person:'佐藤', deadline:offset(7), status:'完了' },
+  { id:5, name:'値段設定と原価計算をする', person:'伊藤', deadline:offset(10), status:'未着手' },
+];
+
+function Step5() {
+  const [tasks, setTasks] = useState(INIT5.map(t=>({...t})));
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({name:'',person:'',deadline:offset(7),status:'未着手'});
+  const nextId = useRef(200);
+
+  const done  = tasks.filter(t=>t.status==='完了').length;
+  const total = tasks.length;
+  const pct   = total===0?0:Math.round(done/total*100);
+  const overdue = tasks.filter(t=>t.status!=='完了'&&diff(t.deadline)<0).length;
+  const soon    = tasks.filter(t=>t.status!=='完了'&&diff(t.deadline)>=0&&diff(t.deadline)<=3).length;
+
+  const genAI = async () => {
+    setAiLoading(true);
+    await new Promise(r=>setTimeout(r,1800));
+    setTasks(ts=>[...ts,...AI_TASKS.map(t=>({id:nextId.current++,...t,status:'未着手'}))]);
+    setAiLoading(false);
+  };
+
+  const addTask = () => {
+    if(!form.name.trim()) return;
+    setTasks(ts=>[...ts,{id:nextId.current++,...form}]);
+    setForm({name:'',person:'',deadline:offset(7),status:'未着手'});
+    setShowForm(false);
+  };
+
+  return (
+    <div className="fadein">
+      <div className="mb-5">
+        <Tag color="green">STEP 5</Tag>
+        <h2 className="text-2xl font-black mt-2 mb-1">完成形：タスク管理シートを仕上げよう</h2>
+        <p className="text-gray-500 text-sm">
+          STEP 1〜4で学んだSUM・IF・COUNTIF・条件付き書式をすべて組み合わせた完成形。<strong className="text-black">自分たちのチームのタスクに差し替えてカスタマイズしよう。</strong>
+        </p>
+      </div>
+
+      {/* 進捗 */}
+      <div className="border-2 border-black rounded-xl p-5 mb-5">
+        <div className="flex justify-between items-end mb-3">
+          <div>
+            <div className="tag text-gray-400 mb-1">COUNTIF / COUNTA</div>
+            <div className="font-black text-4xl">{pct}<span className="text-xl text-gray-400">%</span></div>
+            <div className="text-xs text-gray-400">{done} / {total} タスク完了</div>
+          </div>
+          <div className="flex gap-2 flex-wrap justify-end">
+            {overdue>0&&<div className="bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 text-xs font-bold text-red-600">🚨 期限切れ {overdue}件</div>}
+            {soon>0&&<div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-xs font-bold text-amber-600">⚠️ まもなく {soon}件</div>}
+            {pct===100&&<div className="bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-xs font-bold text-green-600">🎉 全タスク完了！</div>}
+          </div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-3">
+          <div className="h-3 rounded-full transition-all duration-500"
+            style={{width:`${pct}%`,background:pct===100?'#16a34a':'#0a0a0a'}} />
+        </div>
+      </div>
+
+      {/* テーブル */}
+      <div className="border-2 border-black rounded-xl overflow-hidden mb-4">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-black text-white">
+              <th className="cell border-gray-700 text-xs text-gray-500 w-8">#</th>
+              <th className="cell border-gray-700 text-left">タスク名</th>
+              <th className="cell border-gray-700 text-left w-20">担当</th>
+              <th className="cell border-gray-700 text-center w-24">期限</th>
+              <th className="cell border-gray-700 text-center w-32">ステータス</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((t,i)=>{
+              const d=diff(t.deadline); const isDone=t.status==='完了';
+              let rb='';
+              if(isDone) rb='bg-green-50';
+              else if(d<0) rb='bg-red-50';
+              else if(d<=3) rb='bg-amber-50';
+              return (
+                <tr key={t.id} className={`border-b border-gray-100 transition-all ${rb} ${isDone?'opacity-60':''}`}>
+                  <td className="cell text-gray-300 text-xs text-center">{i+1}</td>
+                  <td className={`cell font-medium ${isDone?'line-through text-gray-400':''}`}>{t.name}</td>
+                  <td className={`cell text-sm ${isDone?'text-gray-400':'text-gray-600'}`}>{t.person}</td>
+                  <td className="cell text-center">
+                    <div className={`text-sm font-medium ${isDone?'text-gray-400':d<0?'text-red-600 font-bold':d<=3?'text-amber-600 font-bold':'text-gray-600'}`}>
+                      {fmtDate(t.deadline)}
+                    </div>
+                    {!isDone&&d<0&&<div className="text-xs text-red-500">期限切れ</div>}
+                    {!isDone&&d>=0&&d<=3&&<div className="text-xs text-amber-500">あと{d}日</div>}
+                  </td>
+                  <td className="cell text-center">
+                    <StatusSelect value={t.status} onChange={v=>{const ts=[...tasks];ts[i]={...ts[i],status:v};setTasks(ts);}} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {!showForm?(
+        <button onClick={()=>setShowForm(true)}
+          className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-black hover:text-black text-sm font-medium transition-colors mb-4">
+          ＋ タスクを追加
+        </button>
+      ):(
+        <div className="border-2 border-black rounded-xl p-4 mb-4 fadein">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="col-span-2">
+              <label className="text-xs font-bold text-gray-500 block mb-1">タスク名</label>
+              <input className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+                value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="タスクを入力" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">担当者</label>
+              <input className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+                value={form.person} onChange={e=>setForm(f=>({...f,person:e.target.value}))} placeholder="名前" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-500 block mb-1">期限</label>
+              <input type="date" className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+                value={form.deadline} onChange={e=>setForm(f=>({...f,deadline:e.target.value}))} />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={addTask} className="bg-black text-white text-sm px-5 py-2 rounded-lg hover:bg-gray-800 font-bold">追加</button>
+            <button onClick={()=>setShowForm(false)} className="text-gray-500 text-sm px-4 py-2 rounded-lg hover:bg-gray-100">キャンセル</button>
+          </div>
+        </div>
+      )}
+
+      {/* AI生成 */}
+      <div className="bg-black text-white rounded-xl p-5 mb-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="tag text-green-400 mb-1">✦ AI タスク生成（シミュレーション）</div>
+            <p className="text-gray-400 text-xs mt-1">
+              「チュロス屋の準備に必要なタスクを教えて」とAIに聞くと自動生成。<br/>
+              スプレッドシートでは <span className="text-green-400 font-mono">=AI("プロンプト")</span> 関数で直接呼び出せる（Gemini連携）。
+            </p>
+          </div>
+          <button onClick={genAI} disabled={aiLoading}
+            className={`flex-shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm border-2 transition-all ${
+              aiLoading?'border-gray-600 text-gray-600 ai-pulse cursor-not-allowed':'border-green-400 text-green-400 hover:bg-green-400 hover:text-black'
+            }`}>
+            {aiLoading?'生成中…':'🤖 生成する'}
+          </button>
+        </div>
+      </div>
+
+      <div className="challenge-card mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="font-black text-sm">📋 最終課題：自分のチームのシートを作ろう</span>
+          <Tag color="green">課題</Tag>
+        </div>
+        <Checklist items={[
+          '自分たちの文化祭チームのタスクを入力する（最低5件）',
+          '各タスクに担当者・期限・ステータスを設定する',
+          'COUNTIF で完了件数、未着手件数を集計する',
+          '条件付き書式で期限切れ・まもなく・完了を色分けする',
+          '進捗バー（完了率%）を表示するセルを作る',
+          '【発展】期限切れのタスクだけを別シートに FILTER で抜き出す',
+          '【最発展】GASで期限が近いタスクを自動でSlack/メール通知する',
+        ]} />
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   STEP 6 — 発展課題
+══════════════════════════════════════════════ */
+
+function CodeBlock({code}) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code).then(()=>{
+      setCopied(true); setTimeout(()=>setCopied(false),1500);
+    });
+  };
+  return (
+    <div className="relative mt-2 mb-1">
+      <pre className="bg-gray-950 text-green-400 text-xs rounded-xl p-4 overflow-x-auto leading-relaxed font-mono">{code}</pre>
+      <button onClick={copy}
+        className="absolute top-2 right-2 text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors">
+        {copied ? '✓ コピー済' : 'コピー'}
+      </button>
+    </div>
+  );
+}
+
+const GAS_EXAMPLES = [
+  {
+    level: 0, emoji:'📧', title:'期限アラートをメールで送信',
+    desc:'期限まで3日以内のタスクを自動でメール通知。毎朝9時に実行するよう設定できる。',
+    trigger:'手動 or 時間トリガー（毎朝9時）',
+    code:`function sendDeadlineAlert() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName('STEP4_タスク管理');
+  const data = sh.getRange('B10:E19').getValues();
+  const today = new Date();
+
+  let alerts = '';
+  data.forEach(([task, deadline, person, status]) => {
+    if (status === '完了' || !deadline) return;
+    const diff = Math.ceil((new Date(deadline) - today) / 86400000);
+    if (diff <= 3 && diff >= 0) {
+      alerts += \`・\${task}（担当: \${person}）あと\${diff}日\\n\`;
+    } else if (diff < 0) {
+      alerts += \`・\${task}（担当: \${person}）⚠️ 期限切れ！\\n\`;
+    }
+  });
+
+  if (alerts) {
+    GmailApp.sendEmail(
+      Session.getActiveUser().getEmail(),
+      '【文化祭】期限が近いタスクがあります',
+      '以下のタスクを確認してください:\\n\\n' + alerts
+    );
+    Logger.log('メール送信完了');
+  }
+}`,
+  },
+  {
+    level: 0, emoji:'🔔', title:'onEdit：ステータス変更を自動検知',
+    desc:'ステータスが「完了」に変わった瞬間、完了日時を隣のセルに自動記録する。',
+    trigger:'onEdit（セル編集時に自動実行）',
+    code:`function onEdit(e) {
+  const sh = e.source.getActiveSheet();
+  // STEP4_タスク管理シートのE列（ステータス）が変更されたとき
+  if (sh.getName() !== 'STEP4_タスク管理') return;
+  if (e.range.getColumn() !== 5 || e.range.getRow() < 10) return;
+
+  const status = e.value;
+  const row = e.range.getRow();
+
+  if (status === '完了') {
+    // F列に完了日時を記録
+    const doneCell = sh.getRange(row, 6);
+    doneCell.setValue(new Date());
+    doneCell.setNumberFormat('M/d HH:mm');
+    doneCell.setFontColor('#16a34a');
+  } else {
+    sh.getRange(row, 6).clearContent();
+  }
+}`,
+  },
+  {
+    level: 0, emoji:'⏰', title:'毎朝9時にトリガーを自動設定',
+    desc:'sendDeadlineAlert を毎朝9時に自動実行するトリガーをスクリプトから設定する。',
+    trigger:'一度だけ手動実行 → 以降は自動',
+    code:`function createDailyTrigger() {
+  // 既存トリガーをすべて削除してから再設定
+  ScriptApp.getProjectTriggers()
+    .forEach(t => ScriptApp.deleteTrigger(t));
+
+  ScriptApp.newTrigger('sendDeadlineAlert')
+    .timeBased()
+    .everyDays(1)
+    .atHour(9)  // 毎朝9時
+    .create();
+
+  SpreadsheetApp.getUi()
+    .alert('✅ 毎朝9時に自動メールが設定されました！');
+}`,
+  },
+  {
+    level: 1, emoji:'📝', title:'Googleフォームでタスクを自動追加',
+    desc:'「タスク追加フォーム」を作り、フォーム送信のたびに自動でシートに行を追加する。',
+    trigger:'onFormSubmit（フォーム送信時）',
+    code:`function onFormSubmit(e) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('STEP4_タスク管理');
+  const { namedValues } = e;
+
+  const task     = namedValues['タスク名'][0];
+  const person   = namedValues['担当者'][0];
+  const deadline = new Date(namedValues['期限'][0]);
+
+  // 最後のデータ行の次に追加
+  const lastRow = sh.getLastRow() + 1;
+  sh.getRange(lastRow, 2).setValue(task);
+  sh.getRange(lastRow, 3).setValue(deadline).setNumberFormat('M/d');
+  sh.getRange(lastRow, 4).setValue(person);
+  sh.getRange(lastRow, 5).setValue('未着手');
+
+  // 追加した人にも確認メールを送る
+  GmailApp.sendEmail(
+    Session.getActiveUser().getEmail(),
+    \`【タスク追加】\${task}\`,
+    \`\${person} さんのタスクが追加されました。\\n期限: \${deadline.toLocaleDateString('ja-JP')}\`
+  );
+}`,
+  },
+  {
+    level: 1, emoji:'📦', title:'完了タスクを別シートへアーカイブ',
+    desc:'「完了」になったタスクを「完了アーカイブ」シートへ移動し、アクティブシートをすっきり保つ。',
+    trigger:'手動 or onEdit から呼び出し',
+    code:`function archiveCompletedTasks() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const active = ss.getSheetByName('STEP4_タスク管理');
+
+  // アーカイブシートがなければ自動作成
+  let archive = ss.getSheetByName('完了アーカイブ');
+  if (!archive) {
+    archive = ss.insertSheet('完了アーカイブ');
+    archive.getRange(1,1,1,6)
+      .setValues([['タスク名','期限','担当者','ステータス','完了日','元の行']]);
+  }
+
+  // 下から検索してデータ行を削除（行削除でズレないよう逆順）
+  const lastRow = active.getLastRow();
+  for (let r = lastRow; r >= 10; r--) {
+    const row = active.getRange(r, 2, 1, 4).getValues()[0];
+    const [task, deadline, person, status] = row;
+    if (status !== '完了') continue;
+
+    archive.appendRow([task, deadline, person, status, new Date(), r]);
+    active.deleteRow(r);
+  }
+  SpreadsheetApp.getUi().alert('✅ 完了タスクをアーカイブしました');
+}`,
+  },
+  {
+    level: 1, emoji:'📊', title:'担当者別レポートを週次メール送信',
+    desc:'担当者ごとの完了率を集計し、週1回まとめてメールで送る定期レポートBot。',
+    trigger:'時間トリガー（週1回・月曜9時）',
+    code:`function sendWeeklyReport() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName('STEP4_タスク管理');
+  const data = sh.getRange('B10:E25').getValues();
+
+  // 担当者ごとに集計
+  const report = {};
+  data.forEach(([task, deadline, person, status]) => {
+    if (!task || !person) return;
+    if (!report[person]) report[person] = { total: 0, done: 0, overdue: [] };
+    report[person].total++;
+    if (status === '完了') {
+      report[person].done++;
+    } else {
+      const diff = Math.ceil((new Date(deadline) - new Date()) / 86400000);
+      if (diff < 0) report[person].overdue.push(task);
+    }
+  });
+
+  let body = '📊 週次タスク進捗レポート\\n';
+  body += '='.repeat(30) + '\\n\\n';
+  Object.entries(report).forEach(([name, r]) => {
+    const pct = Math.round(r.done / r.total * 100);
+    body += \`▶ \${name}: \${r.done}/\${r.total} 完了 (\${pct}%)\\n\`;
+    if (r.overdue.length > 0)
+      body += \`  ⚠️ 期限切れ: \${r.overdue.join(', ')}\\n\`;
+  });
+
+  GmailApp.sendEmail(
+    Session.getActiveUser().getEmail(),
+    '【週次】文化祭タスク進捗レポート',
+    body
+  );
+}`,
+  },
+  {
+    level: 2, emoji:'💬', title:'Slack / Discord へ Webhook 通知',
+    desc:'期限切れタスクを Slack や Discord へ自動投稿。Webhook URL を取得して設定するだけ。',
+    trigger:'時間トリガー or onEdit から呼び出し',
+    code:`function notifySlack(message) {
+  // Slack の Incoming Webhook URL（設定 → Integrations で取得）
+  const WEBHOOK_URL = 'https://hooks.slack.com/services/T.../B.../xxx';
+
+  UrlFetchApp.fetch(WEBHOOK_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({
+      text: message,
+      username: '📋 タスク管理Bot',
+      icon_emoji: ':calendar:'
+    })
+  });
+}
+
+function checkAndNotify() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName('STEP4_タスク管理');
+  const data = sh.getRange('B10:E19').getValues();
+  const today = new Date();
+  let msg = '*期限が近いタスク一覧*\\n';
+
+  data.forEach(([task, deadline, person, status]) => {
+    if (status === '完了' || !deadline) return;
+    const diff = Math.ceil((new Date(deadline) - today) / 86400000);
+    if (diff <= 3) msg += \`• \${task}（\${person}） あと\${diff}日\\n\`;
+  });
+
+  notifySlack(msg);
+}`,
+  },
+  {
+    level: 2, emoji:'🌐', title:'Webアプリとして公開する',
+    desc:'GAS を doGet() で実装してWebアプリとして公開。URLを共有するだけで誰でもタスクを確認できる。',
+    trigger:'「デプロイ → 新しいデプロイ」でWebアプリ公開',
+    code:`function doGet() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName('STEP4_タスク管理');
+  const data = sh.getRange('B10:E19').getValues();
+
+  // HTMLを動的に生成
+  let rows = '';
+  data.forEach(([task, deadline, person, status]) => {
+    if (!task) return;
+    const color = status === '完了' ? '#e8f5e9' :
+                  new Date(deadline) < new Date() ? '#ffebee' : '#fff';
+    rows += \`<tr style="background:\${color}">
+      <td>\${task}</td>
+      <td>\${person}</td>
+      <td>\${status}</td>
+    </tr>\`;
+  });
+
+  const html = \`<!DOCTYPE html>
+<html><body>
+<h1>文化祭タスク一覧</h1>
+<table border="1">
+  <tr><th>タスク</th><th>担当</th><th>ステータス</th></tr>
+  \${rows}
+</table>
+</body></html>\`;
+
+  return HtmlService.createHtmlOutput(html);
+}`,
+  },
+];
+
+function Step6() {
+  const [gasTab, setGasTab] = useState(0);
+  const [openIdx, setOpenIdx] = useState(null);
+  const [scores] = useState([
+    { name:'田中', tasks:5, done:3, sales:15000 },
+    { name:'鈴木', tasks:4, done:4, sales:12000 },
+    { name:'山田', tasks:6, done:2, sales:9000  },
+    { name:'佐藤', tasks:3, done:3, sales:18000 },
+    { name:'伊藤', tasks:4, done:1, sales:7000  },
+  ]);
+
+  const tabs = [
+    { label:'関数・数式', color:'black' },
+    { label:'GAS 基礎',  color:'black' },
+    { label:'GAS 中級',  color:'black' },
+    { label:'GAS 上級',  color:'purple'},
+  ];
+  const levelMap = { 0:[0,1,2], 1:[3,4,5], 2:[6,7] };
+
+  function Bar({value, max}) {
+    const pct = Math.round(value/max*100);
+    const col = value===max?'bg-green-500':pct>=50?'bg-blue-500':'bg-amber-500';
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex-1 bg-gray-100 rounded-full h-2">
+          <div className={`h-2 rounded-full ${col}`} style={{width:`${pct}%`}} />
+        </div>
+        <span className="text-xs text-gray-400 w-8 flex-shrink-0">{pct}%</span>
+      </div>
+    );
+  }
+
+  const formulaCards = [
+    { emoji:'📊', title:'SPARKLINE でセル内グラフ',
+      desc:'担当者別の完了率を棒グラフでセル内に表示。charttype を line や pie に変えるとグラフ種類が変わる。',
+      formula:'=SPARKLINE(D2/C2,{"charttype","bar","max",1,"color1","#16a34a"})' },
+    { emoji:'🔍', title:'FILTER で未完了タスクを抽出',
+      desc:'別シートや別の範囲に、未完了のタスクだけを自動でリストアップする。データが更新されると自動反映。',
+      formula:'=FILTER(A2:E20,E2:E20<>"完了")' },
+    { emoji:'🔗', title:'IMPORTRANGE でシートを連携',
+      desc:'チームごとにシートを分けて、集計シートで全チームのタスクを一括表示する。',
+      formula:'=IMPORTRANGE("スプレッドシートURL","シート名!A:E")' },
+    { emoji:'🤖', title:'AI関数でタスクを自動生成',
+      desc:'Gemini連携の=AI()関数でタスクリストを自動生成。セルにイベント名を入力するだけで提案が出る。',
+      formula:'=AI("文化祭の模擬店「チュロス屋」の準備タスクを5件、箇条書きで")' },
+    { emoji:'📅', title:'QUERY で条件検索・ソート',
+      desc:'SQL風の記法でデータを絞り込み・並び替え。担当者でフィルタリングしたり期限順に並べたりできる。',
+      formula:'=QUERY(A:E,"SELECT * WHERE E=\'未着手\' ORDER BY D ASC")' },
+    { emoji:'📈', title:'グラフ（挿入 → グラフ）',
+      desc:'担当者別完了数の棒グラフや、ステータス内訳の円グラフを作る。データ更新で自動反映。',
+      formula:'（メニュー: 挿入 → グラフ → データ範囲を選択）' },
+  ];
+
+  return (
+    <div className="fadein">
+      <div className="mb-5">
+        <Tag color="purple">STEP 6 — 発展</Tag>
+        <h2 className="text-2xl font-black mt-2 mb-1">さらに使いこなす</h2>
+        <p className="text-gray-500 text-sm">
+          基本をマスターしたら次は<strong className="text-black">「自動化」</strong>へ。関数の発展技と、スプレッドシートをプログラムで操作できる<strong className="text-black">Google Apps Script（GAS）</strong>を学ぼう。
+        </p>
+      </div>
+
+      {/* タブ */}
+      <div className="flex gap-1.5 mb-5 border-b-2 border-black pb-3 flex-wrap">
+        {tabs.map((t,i)=>(
+          <button key={i} onClick={()=>{ setGasTab(i); setOpenIdx(null); }}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              gasTab===i
+                ? i===3 ? 'bg-purple-700 text-white' : 'bg-black text-white'
+                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}>{t.label}</button>
+        ))}
+      </div>
+
+      {/* 関数・数式 */}
+      {gasTab===0 && (
+        <div className="fadein">
+          {/* SPARKLINE デモテーブル */}
+          <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
+            <div className="bg-black text-white px-5 py-3 flex justify-between items-center flex-wrap gap-2">
+              <span className="font-black">SPARKLINE — セル内グラフのデモ</span>
+              <Formula>{'=SPARKLINE(完了数/タスク数,{"charttype","bar","max",1})'}</Formula>
+            </div>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  <th className="cell cell-head text-left">担当者</th>
+                  <th className="cell cell-head text-center">タスク</th>
+                  <th className="cell cell-head text-center">完了</th>
+                  <th className="cell cell-head text-right">売上貢献</th>
+                  <th className="cell cell-head text-left">完了率グラフ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scores.map((s,i)=>(
+                  <tr key={i} className="border-b border-gray-50">
+                    <td className="cell font-medium">{s.name}</td>
+                    <td className="cell text-center text-gray-500">{s.tasks}</td>
+                    <td className="cell text-center text-green-600 font-bold">{s.done}</td>
+                    <td className="cell text-right font-mono text-xs">¥{comma(s.sales)}</td>
+                    <td className="cell"><Bar value={s.done} max={s.tasks} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="space-y-3">
+            {formulaCards.map((c,i)=>(
+              <div key={i} className="advance-card">
+                <div className="flex items-start gap-2 mb-1">
+                  <span>{c.emoji}</span>
+                  <span className="font-bold text-sm text-purple-800">{c.title}</span>
+                </div>
+                <p className="text-xs text-gray-600 mb-2">{c.desc}</p>
+                <Formula>{c.formula}</Formula>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* GAS タブ（基礎/中級/上級）*/}
+      {gasTab > 0 && (
+        <div className="fadein">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5 text-sm">
+            <strong className="text-black">📌 GAS の使い方:</strong>
+            スプレッドシートの <strong>拡張機能 → Apps Script</strong> を開いて、下のコードを貼り付けて実行ボタンを押すだけ。
+            {gasTab===3 && <span className="ml-1 text-purple-700 font-bold">上級: 外部サービス連携あり。URLや設定が必要。</span>}
+          </div>
+          <div className="space-y-3">
+            {(levelMap[gasTab-1]||[]).map(idx => {
+              const ex = GAS_EXAMPLES[idx];
+              const isOpen = openIdx === idx;
+              return (
+                <div key={idx} className={`border-2 rounded-xl overflow-hidden transition-all ${isOpen?'border-black':'border-gray-200'}`}>
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    onClick={()=>setOpenIdx(isOpen?null:idx)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{ex.emoji}</span>
+                      <div>
+                        <div className="font-bold text-sm">{ex.title}</div>
+                        <div className="text-xs text-gray-500">{ex.desc}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full hidden sm:block">{ex.trigger}</span>
+                      <span className="text-gray-400 text-sm font-bold">{isOpen?'▲':'▼'}</span>
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-gray-100 px-4 pb-4 fadein">
+                      <div className="text-xs text-gray-400 mt-2 mb-1">
+                        <span className="font-bold text-gray-600">実行タイミング:</span> {ex.trigger}
+                      </div>
+                      <CodeBlock code={ex.code} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-black text-white rounded-xl p-5 mt-6">
+        <div className="font-black mb-2">🎓 GAS はプログラミングの入口</div>
+        <p className="text-gray-400 text-sm">
+          GAS は <strong className="text-white">JavaScript</strong> で書く。今日学んだ IF・COUNTIF の考え方はプログラミングにそのまま使える。<br/>
+          スプレッドシートを「自動で動くシステム」にできたら、次は <strong className="text-white">Webアプリ開発</strong> へ進もう。
+        </p>
+        <div className="flex gap-2 mt-3 flex-wrap">
+          {['JavaScript 基礎','HTML/CSS','React','Node.js'].map(s=>(
+            <span key={s} className="text-xs border border-gray-600 text-gray-400 px-2 py-1 rounded-full">{s} →</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   メインアプリ
+══════════════════════════════════════════════ */
+const STEPS_DEF = [
+  { id:0,  label:'導入',    short:'90分の流れ',    color:'green' },
+  { id:1,  label:'SUM/AVG', short:'合計・平均',    color:'black' },
+  { id:2,  label:'IF/IFS',  short:'条件判定',      color:'black' },
+  { id:3,  label:'COUNTIF', short:'集計',          color:'black' },
+  { id:4,  label:'書式',    short:'プルダウン・色', color:'black' },
+  { id:5,  label:'完成形',  short:'タスク管理',    color:'green' },
+  { id:6,  label:'発展',    short:'グラフ・AI',    color:'purple' },
+];
+
+function App() {
+  const [step, setStep] = useState(0);
+
+  const content = [
+    <Intro onStart={()=>setStep(1)} />,
+    <Step1 />, <Step2 />, <Step3 />, <Step4 />, <Step5 />, <Step6 />,
+  ][step];
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* トップバー */}
+      <div className="border-b-2 border-black sticky top-0 bg-white z-10">
+        <div className="max-w-3xl mx-auto px-5 py-3 flex items-center justify-between">
+          <div>
+            <div className="tag text-gray-400 text-xs">情報工学基礎 — 神山まるごと高専</div>
+            <h1 className="text-base font-black">スプレッドシート実習</h1>
+          </div>
+          <div className="text-xs text-gray-400">
+            <span className="font-mono text-black">=TODAY()</span>
+            <span className="ml-1">{today.getFullYear()}/{today.getMonth()+1}/{today.getDate()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ステップナビ */}
+      <div className="border-b border-gray-100 bg-gray-50">
+        <div className="max-w-3xl mx-auto px-5 py-3 overflow-x-auto">
+          <div className="flex gap-1.5 min-w-max">
+            {STEPS_DEF.map(s=>(
+              <button key={s.id} onClick={()=>setStep(s.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all step-nav-btn whitespace-nowrap ${
+                  step===s.id
+                    ? s.color==='purple' ? 'bg-purple-700 text-white'
+                    : s.color==='green'  ? 'bg-green-600 text-white'
+                    : 'bg-black text-white'
+                    : step>s.id && s.id>0
+                    ? 'bg-green-100 text-green-700 border border-green-200'
+                    : 'bg-white border border-gray-200 text-gray-400 hover:border-black hover:text-black'
+                }`}>
+                <span className="text-xs opacity-60">{step>s.id&&s.id>0?'✓':s.id===0?'▶':s.id}</span>
+                <span>{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* コンテンツ */}
+      <div className="max-w-3xl mx-auto px-5 py-8">
+        {content}
+
+        {/* 前後ボタン */}
+        <div className="flex justify-between mt-10 pt-6 border-t-2 border-gray-100">
+          <button onClick={()=>setStep(s=>Math.max(0,s-1))} disabled={step===0}
+            className="px-5 py-2.5 border-2 border-gray-200 rounded-xl text-sm font-bold text-gray-400 hover:border-black hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+            ← 前へ
+          </button>
+          <div className="flex gap-1 items-center">
+            {STEPS_DEF.map(s=>(
+              <button key={s.id} onClick={()=>setStep(s.id)}
+                className={`rounded-full transition-all ${
+                  step===s.id?'w-6 h-2 bg-black':step>s.id?'w-2 h-2 bg-green-400':'w-2 h-2 bg-gray-200'
+                }`} />
+            ))}
+          </div>
+          <button onClick={()=>setStep(s=>Math.min(6,s+1))} disabled={step===6}
+            className="px-5 py-2.5 bg-black text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+            次へ →
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t-2 border-black">
+        <div className="max-w-3xl mx-auto px-5 py-4 flex justify-between text-xs text-gray-300">
+          <span>情報工学基礎 スプレッドシート実習</span>
+          <span>神山まるごと高専</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
