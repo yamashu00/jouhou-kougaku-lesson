@@ -110,6 +110,33 @@ function AdvCard({emoji,title,desc,formula}) {
   );
 }
 
+/* 関数の構造解説カード */
+function SyntaxCard({items}) {
+  const CLS = {gray:'bg-gray-700',green:'bg-green-600',blue:'bg-blue-500',orange:'bg-orange-500',red:'bg-red-500',purple:'bg-purple-600'};
+  return (
+    <div className="border-2 border-black rounded-xl overflow-hidden mb-4">
+      <div className="bg-gray-950 px-4 py-3 font-mono text-sm flex flex-wrap gap-1 items-baseline leading-loose">
+        {items.map((it,i)=>
+          it.label
+            ? <span key={i} className={`px-1.5 py-0.5 rounded font-bold text-white text-xs ${CLS[it.color]||'bg-gray-600'}`}>{it.text}</span>
+            : <span key={i} className="text-gray-300">{it.text}</span>
+        )}
+      </div>
+      <div className="divide-y divide-gray-100">
+        {items.filter(it=>it.label).map((it,i)=>(
+          <div key={i} className="flex items-start gap-3 px-4 py-2">
+            <span className={`flex-shrink-0 font-mono text-xs font-bold px-2 py-0.5 rounded text-white ${CLS[it.color]||'bg-gray-600'}`}>{it.text}</span>
+            <div>
+              <span className="font-bold text-sm">{it.label}</span>
+              {it.desc&&<p className="text-xs text-gray-500 mt-0.5">{it.desc}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ステータス select */
 function StatusSelect({value, onChange}) {
   const cls = value==='完了' ? 's-done' : value==='進行中' ? 's-doing' : 's-todo';
@@ -227,10 +254,21 @@ function Step1() {
         </p>
       </div>
 
-      <div className="flex gap-3 flex-wrap mb-5">
+      <div className="flex gap-3 flex-wrap mb-4">
         <div><Formula>=SUM(C2:C6)</Formula><span className="text-xs text-gray-400 ml-2">← 支出の合計</span></div>
         <div><Formula>=AVERAGE(C2:C6)</Formula><span className="text-xs text-gray-400 ml-2">← 支出の平均</span></div>
       </div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">🔍 関数の構造を読み解こう</p>
+      <SyntaxCard items={[
+        {text:'=',label:null},
+        {text:'SUM',label:'関数名',desc:'何をするかの命令。SUM ＝「合計する」　（AVERAGEなら「平均を出す」）',color:'gray'},
+        {text:'(',label:null},
+        {text:'B2',label:'範囲の始まり',desc:'合計したい最初のセル番地（行・列で1つのマスを指定）',color:'green'},
+        {text:' : ',label:'コロン「 : 」',desc:'「〜から〜まで」を表す記号。始まりと終わりのセルをつなぐ',color:'blue'},
+        {text:'B6',label:'範囲の終わり',desc:'合計したい最後のセル番地',color:'orange'},
+        {text:')',label:null},
+      ]} />
 
       <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
         <table className="w-full text-sm border-collapse">
@@ -336,6 +374,30 @@ function Step2() {
         <div>
           <Formula>=IFS(D2="完了","✅ 完了", E2&lt;TODAY(),"🚨 期限切れ", TRUE,"🟢 余裕あり")</Formula>
           <p className="text-xs text-gray-400 mt-1 ml-1">IFS関数を使うとすっきり書ける（発展）</p>
+        </div>
+      </div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">🔍 IF 関数の3つの部品</p>
+      <SyntaxCard items={[
+        {text:'=IF(',label:null},
+        {text:'D2="完了"',label:'① 条件（論理式）',desc:'TRUEかFALSEになる比較式。「もし〇〇なら」の〇〇部分',color:'orange'},
+        {text:' , ',label:null},
+        {text:'"✅ 完了"',label:'② TRUEのとき（真）',desc:'条件が正しかったとき（TRUE）にセルへ表示する値',color:'green'},
+        {text:' , ',label:null},
+        {text:'"❌ 未完了"',label:'③ FALSEのとき（偽）',desc:'条件が間違っていたとき（FALSE）にセルへ表示する値',color:'red'},
+        {text:')',label:null},
+      ]} />
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5">
+        <p className="font-bold text-xs mb-3">比較演算子 — 条件式で使う記号</p>
+        <div className="grid grid-cols-3 gap-3 text-xs">
+          {[['=','等しい','A2="完了"'],['<>','等しくない','A2<>"完了"'],['>','より大きい','B2>100'],
+            ['<','より小さい','C2<TODAY()'],['>=','以上','C2>=60'],['<=','以下','C2<=3']].map(([op,desc,ex])=>(
+            <div key={op} className="space-y-0.5">
+              <div className="font-mono font-black text-base">{op}</div>
+              <div className="text-gray-600">{desc}</div>
+              <div className="font-mono text-gray-400">{ex}</div>
+            </div>
+          ))}
         </div>
       </div>
 
