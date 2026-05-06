@@ -1164,6 +1164,7 @@ function Step6() {
 
   const tabs = [
     { label:'関数・数式', color:'black' },
+    { label:'GAS 入門',  color:'black' },
     { label:'GAS 基礎',  color:'black' },
     { label:'GAS 中級',  color:'black' },
     { label:'GAS 上級',  color:'purple'},
@@ -1220,7 +1221,7 @@ function Step6() {
           <button key={i} onClick={()=>{ setGasTab(i); setOpenIdx(null); }}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
               gasTab===i
-                ? i===3 ? 'bg-purple-700 text-white' : 'bg-black text-white'
+                ? i===4 ? 'bg-purple-700 text-white' : 'bg-black text-white'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}>{t.label}</button>
         ))}
@@ -1273,16 +1274,145 @@ function Step6() {
         </div>
       )}
 
+      {/* GAS 入門 */}
+      {gasTab===1 && (
+        <div className="fadein">
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5 text-sm">
+            <strong className="text-black">🎯 今日の目標:</strong> AIで生成したWebアプリをGASでデプロイして、自分だけのURLを発行しよう。
+          </div>
+
+          {/* STEP 01 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-black text-sm flex-shrink-0">01</div>
+              <div>
+                <div className="tag text-gray-400">STEP 01</div>
+                <div className="font-black">準備（Ready）</div>
+              </div>
+            </div>
+            <div className="ml-11">
+              <div className="challenge-card">
+                <Checklist items={[
+                  '学校のGoogleアカウントでログインする',
+                  'ブラウザで gemini.google.com を開く',
+                ]} />
+              </div>
+            </div>
+          </div>
+
+          {/* STEP 02 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-black text-sm flex-shrink-0">02</div>
+              <div>
+                <div className="tag text-gray-400">STEP 02</div>
+                <div className="font-black">設定（Setup）</div>
+              </div>
+            </div>
+            <div className="ml-11">
+              <div className="challenge-card">
+                <Checklist items={[
+                  'Gemini 2.0 Flash 以降（最新）モデルが選択されているか確認する',
+                  'Canvas 表示が使える場合はそれを選択する',
+                ]} />
+              </div>
+            </div>
+          </div>
+
+          {/* STEP 03 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-black text-sm flex-shrink-0">03</div>
+              <div>
+                <div className="tag text-gray-400">STEP 03</div>
+                <div className="font-black">生成（Generate）</div>
+              </div>
+            </div>
+            <div className="ml-11">
+              <p className="text-xs text-gray-500 mb-2">以下のプロンプトをGeminiにそのまま貼り付けて送信しよう。</p>
+              <CodeBlock code={`優秀なWebエンジニアとして、高校生向け学習用Webアプリを作成してください。
+テーマ：シンプルな「ストップウォッチ」。
+要件：Tailwind CSS使用、黒背景とネオン色（緑・ピンク）のサイバーデザイン；
+　　　スタート・ストップ・リセットボタン；大型時間表示（00:00:00形式）。
+コード出力のみ。`} />
+              <div className="challenge-card mt-3">
+                <Checklist items={[
+                  'Geminiにプロンプトを貼り付けて送信する',
+                  'HTMLコードが生成されたことを確認する',
+                  '生成されたコードをコピーしておく',
+                ]} />
+              </div>
+            </div>
+          </div>
+
+          {/* STEP 04 */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-black text-sm flex-shrink-0">04</div>
+              <div>
+                <div className="tag text-gray-400">STEP 04</div>
+                <div className="font-black">構築（Build）</div>
+              </div>
+            </div>
+            <div className="ml-11">
+              <p className="text-xs text-gray-500 mb-2">
+                <span className="font-mono bg-gray-100 px-1 rounded text-xs">script.google.com/home</span> にアクセスして「新しいプロジェクト」を作成する。
+              </p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1">コード.gs に貼り付けるコード</p>
+              <CodeBlock code={`function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}`} />
+              <div className="challenge-card mt-3">
+                <Checklist items={[
+                  'script.google.com/home で「新しいプロジェクト」をクリック',
+                  'コード.gs の既存コードをすべて削除して上記コードを貼り付ける',
+                  '画面左上「ファイル ＋」→「HTML」を選択、ファイル名を「index」にする',
+                  'Geminiが生成したHTMLコードを index.html に貼り付ける',
+                  'プロジェクトを保存する（Ctrl + S）',
+                ]} />
+              </div>
+            </div>
+          </div>
+
+          {/* STEP 05 */}
+          <div className="mb-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center font-black text-sm flex-shrink-0">05</div>
+              <div>
+                <div className="tag text-gray-400">STEP 05</div>
+                <div className="font-black">公開（Deploy）</div>
+              </div>
+            </div>
+            <div className="ml-11">
+              <div className="challenge-card">
+                <Checklist items={[
+                  '画面右上「デプロイ」→「新しいデプロイ」をクリック',
+                  '歯車⚙アイコン →「ウェブアプリ」を選択',
+                  '実行ユーザー：「自分」を選択',
+                  'アクセス権限：「神山まるごと高専内の全員」を選択',
+                  '「デプロイ」ボタンをクリック',
+                  '発行されたURLをコピーしてブラウザで動作確認する',
+                ]} />
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 text-xs">
+                <strong className="text-amber-700">⚠️ 注意:</strong> アクセス権限が「自分のみ」だと他の人がアクセスできません。必ず「神山まるごと高専内の全員」を選択してください。
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* GAS タブ（基礎/中級/上級）*/}
-      {gasTab > 0 && (
+      {gasTab > 1 && (
         <div className="fadein">
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5 text-sm">
             <strong className="text-black">📌 GAS の使い方:</strong>
             スプレッドシートの <strong>拡張機能 → Apps Script</strong> を開いて、下のコードを貼り付けて実行ボタンを押すだけ。
-            {gasTab===3 && <span className="ml-1 text-purple-700 font-bold">上級: 外部サービス連携あり。URLや設定が必要。</span>}
+            {gasTab===4 && <span className="ml-1 text-purple-700 font-bold">上級: 外部サービス連携あり。URLや設定が必要。</span>}
           </div>
           <div className="space-y-3">
-            {(levelMap[gasTab-1]||[]).map(idx => {
+            {(levelMap[gasTab-2]||[]).map(idx => {
               const ex = GAS_EXAMPLES[idx];
               const isOpen = openIdx === idx;
               return (
