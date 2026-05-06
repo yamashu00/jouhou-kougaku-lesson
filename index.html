@@ -482,12 +482,31 @@ function Step3() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
+      <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
         <div><Formula>=COUNTIF(D:D,"完了")</Formula><p className="text-xs text-gray-400 mt-1">D列の「完了」の数を数える</p></div>
         <div><Formula>=COUNTA(A2:A100)</Formula><p className="text-xs text-gray-400 mt-1">タスクの総数を数える</p></div>
         <div><Formula>=COUNTIF(D:D,"完了")/COUNTA(A2:A100)</Formula><p className="text-xs text-gray-400 mt-1">完了率（%）を計算する</p></div>
         <div><Formula>=COUNTIFS(C:C,"田中",D:D,"完了")</Formula><p className="text-xs text-gray-400 mt-1">田中さんの完了数（複数条件）</p></div>
       </div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">🔍 COUNTIF 関数の構造</p>
+      <SyntaxCard items={[
+        {text:'=',label:null},
+        {text:'COUNTIF',label:'関数名',desc:'COUNTIF ＝「条件に合うセルを数える」',color:'gray'},
+        {text:'(',label:null},
+        {text:'D:D',label:'① 範囲',desc:'どの列・範囲を調べるか。D:D はD列全体、D2:D20 のように指定してもOK',color:'green'},
+        {text:' , ',label:null},
+        {text:'"完了"',label:'② 検索条件',desc:'何を数えるか。文字列は " " で囲む。数値はそのまま書く（例: >0）',color:'orange'},
+        {text:')',label:null},
+      ]} />
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">🔍 COUNTA 関数の構造</p>
+      <SyntaxCard items={[
+        {text:'=',label:null},
+        {text:'COUNTA',label:'関数名',desc:'COUNTA ＝「空でないセルを数える」。何が入っていても1件と数える',color:'gray'},
+        {text:'(',label:null},
+        {text:'A2:A100',label:'範囲',desc:'数えたいセルの範囲。タスク名が入っている列を指定すると総件数になる',color:'green'},
+        {text:')',label:null},
+      ]} />
 
       {/* リアルタイム集計ボード */}
       <div className="border-2 border-black rounded-xl overflow-hidden mb-5">
