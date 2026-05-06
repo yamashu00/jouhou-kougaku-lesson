@@ -200,7 +200,7 @@ function Intro({onStart}) {
             <div key={i} className={`flex items-center gap-4 px-5 py-3 border-b border-gray-100 last:border-0 ${i===0?'bg-green-50':''}`}>
               <div className="w-20 flex-shrink-0 font-mono text-xs text-gray-400">{t.time}</div>
               <div className="w-20 flex-shrink-0">
-                <span className={`tag text-xs px-2 py-0.5 rounded-full ${
+                <span className={`tag text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
                   t.step==='基本' ? 'bg-black text-white' :
                   t.step==='実践' ? 'bg-gray-700 text-white' :
                   t.step==='発展' ? 'bg-purple-700 text-white' :
